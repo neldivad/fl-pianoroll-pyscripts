@@ -1,5 +1,8 @@
 # FL Piano Roll PyScripts
 
+## Support the author
+[Youtube](https://www.youtube.com/@justneldivad)
+
 ## Usage
 To use this preset, download the script file and paste them into your piano roll script folder. Typically, the directory is as follows: 
 

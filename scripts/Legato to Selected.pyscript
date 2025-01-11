@@ -1,14 +1,15 @@
 # Author: David Len (NEL-V)
 # YT: https://www.youtube.com/@justneldivad
-# version: 0.1
+# version: 0.2
 
 import flpianoroll as flp
+from itertools import groupby
 
 label = 'Legato to Selected'
 
 dialog = """
 by NEL-V
-version: 0.1
+version: 0.2
 
 This script adjusts the length of selected notes to create a legato effect. Unlike quick legato (Ctrl+L), this script will ONLY adjust the length of all selected notes to the start of the next selected note.
 
@@ -57,20 +58,23 @@ def apply(form):
     if not selected_notes:
         print("No notes selected. Please select notes in the Piano Roll.")
         return
+    
+    # Group notes by start time to allow legato to chords as well
+    grouped_notes = [
+        list(group) for _, group in groupby(selected_notes, key=lambda x: x['start'])
+    ]
 
-    # Sort selected notes by start time
-    selected_notes.sort(key=lambda x: x['start'])
+    # Adjust lengths for each group
+    for i in range(len(grouped_notes) - 1):
+        current_group = grouped_notes[i]
+        next_group = grouped_notes[i + 1]
 
-    # Adjust lengths of notes
-    for i in range(len(selected_notes) - 1):
-        current_note = selected_notes[i]
-        next_note = selected_notes[i + 1]
+        # Calculate the end time for the current group (start time of the next group)
+        group_end_time = next_group[0]['start']
 
-        # Calculate the new length to reach the next note's start
-        new_length = next_note['start'] - current_note['start']
-
-        # Ensure positive length
-        flp.score.getNote(current_note['idx']).length = max(1, new_length)  
-
+        # Adjust all notes in the current group
+        for note in current_group:
+            new_length = group_end_time - note['start']
+            flp.score.getNote(note['idx']).length = max(1, new_length)  # Ensure positive length
 
     print("Legato applied successfully.")

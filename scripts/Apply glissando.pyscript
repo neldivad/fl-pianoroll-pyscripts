@@ -1,3 +1,8 @@
+# Author: David Len (NEL-V)
+# YT: https://www.youtube.com/@justneldivad
+# version: 0.1
+
+
 import flpianoroll as flp
 
 label = 'Apply glissando'
