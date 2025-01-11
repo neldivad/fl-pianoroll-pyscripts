@@ -1,0 +1,111 @@
+import flpianoroll as flp
+
+label = 'Apply glissando'
+
+dialog = """
+by NEL-V
+version: 0.1
+
+Creates glissando between 2 notes of different start time and pitches. 
+"""
+
+
+def createDialog():
+    """
+    Creates the dialog for the Glissando Tool.
+    """
+    root_notes = ["None", "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+    scales = ["None", "Major", "Minor"]
+
+    form = flp.ScriptDialog("Glissando Tool", dialog)
+    form.AddInputCombo("Root Note", root_notes, 0)  # Default to "None"
+    form.AddInputCombo("Scale", scales, 0) # Default to "None"
+    form.AddInputKnob("Velocity Reduction (%)", 0, -10, 10)  # Default: 0%
+    return form
+
+
+def apply(form):
+    """
+    Applies the glissando effect.
+    """
+    root_notes = ["None", "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+    scales = {
+        "None": [],
+        "Major": [0, 2, 4, 5, 7, 9, 11],
+        "Minor": [0, 2, 3, 5, 7, 8, 10],
+    }
+
+    # Get user input
+    root_idx = form.GetInputValue("Root Note")  # Index of selected root note
+    scale_idx = form.GetInputValue("Scale")    # Index of selected scale
+    velocity_reduction_percent = form.GetInputValue("Velocity Reduction (%)") / 100
+
+    # Determine root note and scale
+    root_note = root_notes[root_idx]
+    scale_keys = list(scales.keys())  # Convert dict_keys to a list
+    scale_intervals = scales[scale_keys[scale_idx]] if scale_idx < len(scale_keys) else []
+
+    # Get selected notes
+    selected_notes = [flp.score.getNote(i) for i in range(flp.score.noteCount) if flp.score.getNote(i).selected]
+    if len(selected_notes) != 2:
+        flp.Utils.ShowMessage("Please select exactly two notes with different pitches and start times.")
+        return
+
+    first_note, last_note = selected_notes
+    if first_note.number == last_note.number or first_note.time == last_note.time:
+        flp.Utils.ShowMessage("Selected notes must have different pitches and start times.")
+        return
+
+    # Ensure first note comes before last note in time
+    if first_note.time > last_note.time:
+        first_note, last_note = last_note, first_note
+    
+    # Get pitch range between the selected notes
+    pitch_start = min(first_note.number, last_note.number)
+    pitch_end = max(first_note.number, last_note.number)
+
+    # If a scale is selected, filter pitches within the scale
+    if scale_intervals:
+        root_midi = (root_idx - 1) % 12  # Subtract 1 because "None" is at index 0
+        pitch_range = [
+            pitch for pitch in range(pitch_start, pitch_end + 1)
+            if (pitch % 12 - root_midi) % 12 in scale_intervals
+        ]
+    else:
+        # No scale selected, include all pitches
+        pitch_range = list(range(pitch_start, pitch_end + 1))
+
+    # Exclude the first and last pitches from the range
+    pitch_range = pitch_range[1:-1]
+
+    # Validate pitch range
+    gap = last_note.time - (first_note.time + first_note.length)
+    num_fill_notes = len(pitch_range)
+    if len(pitch_range) <= 2:
+        flp.Utils.ShowMessage("No intermediate notes to fill.")
+        return
+
+    # Auto adjust the note spacing based on the number of notes and gap from start note to end note
+    note_spacing = gap // (num_fill_notes)
+    note_duration = max(1, note_spacing)  # Minimum duration = 1 tick
+
+    # Add notes
+    for i, pitch in enumerate(pitch_range):
+        new_note = flp.Note()
+        new_note.number = pitch
+        new_note.time = first_note.time + first_note.length + (i * note_spacing)
+        new_note.length = note_duration
+        flp.score.addNote(new_note)
+
+    # Adjust velocity
+    filled_notes = [flp.score.getNote(i) for i in range(flp.score.noteCount) if flp.score.getNote(i).time > first_note.time and flp.score.getNote(i).time < last_note.time]
+    all_notes = [first_note] + filled_notes + [last_note]
+    
+    for i, note in enumerate(all_notes):
+        if i == 0:
+            continue  # First note remains unchanged
+        reduction_factor = 1 - (velocity_reduction_percent * i)
+        note.velocity *= max(reduction_factor, 0.0)
+
+    print("Glissando applied successfully.")
+

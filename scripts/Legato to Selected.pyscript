@@ -1,0 +1,76 @@
+# Author: David Len (NEL-V)
+# YT: https://www.youtube.com/@justneldivad
+# version: 0.1
+
+import flpianoroll as flp
+
+label = 'Legato to Selected'
+
+dialog = """
+by NEL-V
+version: 0.1
+
+This script adjusts the length of selected notes to create a legato effect. Unlike quick legato (Ctrl+L), this script will ONLY adjust the length of all selected notes to the start of the next selected note.
+
+
+"""
+
+class NoteObj:
+    def __init__(self, time, length, number, idx):
+        self.start = time
+        self.end = time + length
+        self.number = number
+        self.idx = idx
+
+    def set_end(self, new_end):
+        self.end = new_end
+        self.length = self.end - self.start
+
+
+def createDialog():
+    """
+    Creates the dialog box for the script.
+    """
+    form = flp.ScriptDialog(
+        "Legato to Selected",
+        dialog,
+    )
+    return form
+
+
+def apply(form):
+    """
+    Adjusts the length of selected notes to the start of the next selected note.
+    """
+    # Collect selected notes
+    selected_notes = []
+    for n in range(flp.score.noteCount):
+        note = flp.score.getNote(n)
+        if note.selected:
+            selected_notes.append({
+                'idx': n,
+                'start': note.time,
+                'length': note.length,
+                'pitch': note.number
+            })
+
+    if not selected_notes:
+        print("No notes selected. Please select notes in the Piano Roll.")
+        return
+
+    # Sort selected notes by start time
+    selected_notes.sort(key=lambda x: x['start'])
+
+    # Adjust lengths of notes
+    for i in range(len(selected_notes) - 1):
+        current_note = selected_notes[i]
+        next_note = selected_notes[i + 1]
+
+        # Calculate the new length to reach the next note's start
+        new_length = next_note['start'] - current_note['start']
+
+        # Ensure positive length
+        flp.score.getNote(current_note['idx']).length = max(1, new_length)  
+
+
+    print("Legato applied successfully.")

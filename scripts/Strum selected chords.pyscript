@@ -1,0 +1,102 @@
+# Author: David Len (NEL-V)
+# YT: https://www.youtube.com/@justneldivad
+# version: 0.1
+
+import flpianoroll as flp
+
+label = 'Strum selected chords'
+
+dialog = """
+by NEL-V
+version: 0.1
+
+Strums all selected chords in the Piano Roll. Chords must be quantized or have same start times to be identified as a group.
+"""
+
+
+def createDialog():
+    """
+    Creates the dialog for the Strum Selected Chord script.
+    """
+    form = flp.ScriptDialog("Strum selected chords", dialog)
+
+    form.AddInputKnob("Time Offset (ms)", 0, 0, 100)  # Default: 0
+    form.AddInputKnob("Velocity Reduction (%)", 0, 0, 50)  # Default: 0
+    form.AddInputKnob("Minimum Note Duration (ms)", 1, 1, 500)  # Default: 1ms
+    form.AddInputCheckbox("Alternate Strum", True)
+    return form
+
+
+def apply(form):
+    """
+    Applies the strumming effect to selected chords in the Piano Roll.
+    """
+    # Get user settings
+    time_offset_ms = form.GetInputValue("Time Offset (ms)")
+    velocity_reduction_percent = form.GetInputValue("Velocity Reduction (%)") / 100
+    min_duration_ms = form.GetInputValue("Minimum Note Duration (ms)")
+    alternate_strum = form.GetInputValue("Alternate Strum")
+
+    # Convert time and duration offsets to ticks
+    time_offset_ticks = int(flp.score.PPQ * (time_offset_ms / 1000))
+    min_duration_ticks = int(flp.score.PPQ * (min_duration_ms / 1000))
+
+
+    # Collect all selected notes
+    notes = []
+    for n in range(flp.score.noteCount):
+        note = flp.score.getNote(n)
+        if note.selected:
+            notes.append({
+                'idx': n,
+                'start': note.time,
+                'length': note.length,
+                'end': note.time + note.length,
+                'velocity': note.velocity,  # Velocity is in range [0.0, 1.0]
+                'pitch': note.number
+            })
+
+    if not notes:
+        print("No notes selected. Please select notes in the Piano Roll.")
+        return
+
+    # Group notes by start time to identify chords
+    chords = {}
+    for note in notes:
+        if note['start'] in chords:
+            chords[note['start']].append(note)
+        else:
+            chords[note['start']] = [note]
+
+    # Process each chord
+    is_downstroke = True  # Start with downstroke
+    for start_time, chord in sorted(chords.items()):
+        # Sort chord notes based on pitch (ascending for downstroke, descending for upstroke)
+        chord.sort(key=lambda x: x['pitch'], reverse=not is_downstroke)
+
+        # Apply strumming
+        for i, note in enumerate(chord):
+            # Calculate time offset
+            delay = i * time_offset_ticks
+            new_start = note['start'] + delay
+            new_length = note['end'] - new_start
+
+            # Ensure minimum duration
+            new_length = max(new_length, min_duration_ticks)
+
+            # Update note timing
+            flp.score.getNote(note['idx']).time = new_start
+            flp.score.getNote(note['idx']).length = new_length
+
+            # Calculate velocity reduction
+            if i > 0:  # First note remains unchanged
+                previous_velocity = chord[i - 1]['velocity']
+                reduction_factor = 1 - (velocity_reduction_percent * i)  # Scaled by index
+                new_velocity = previous_velocity * max(reduction_factor, 0.0)  # Avoid negative reduction
+                flp.score.getNote(note['idx']).velocity = min(max(new_velocity, 0.0), 1.0)
+
+        # Toggle strum direction for the next chord if alternate strum is enabled
+        if alternate_strum:
+            is_downstroke = not is_downstroke
+
+    print("Strum applied successfully.")
