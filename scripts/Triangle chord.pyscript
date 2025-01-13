@@ -1,0 +1,93 @@
+# Author: David Len (NEL-V)
+# YT: https://www.youtube.com/@justneldivad
+# version: 0.1
+
+import flpianoroll as flp
+
+
+
+dialog = """
+by NEL-V
+version: 0.1
+
+This script simulates a pedal effect by creating a triangle-like MIDI pattern.
+
+It shifts the start times of notes in a chord to form a stair-step pattern while maintaining the note's original end time.
+The script allows control over the stair direction, step size, and velocity scaling through knobs.
+"""
+
+label_stair = "Stair Shift"
+label_velocity = "Velocity Offset"
+label_reverse = "Reverse"
+
+def createDialog():
+    form = flp.ScriptDialog("Triangle MIDI Pattern", dialog)
+
+    # Add input knobs for stair shift and velocity offset
+    form.AddInputKnobInt(label_stair, 0, 0, 16)  # Stair shift knob
+    form.AddInputCheckbox(label_reverse, False)
+    form.AddInputKnob(label_velocity, 0, -20, 20) # Velocity offset
+    return form
+    
+
+def apply(form):
+    """
+    Applies a triangle-like stair effect to a rectangular chord,
+    shifting start times sequentially by a 1/16 note offset
+    while maintaining note lengths and applying velocity changes.
+    """
+    # Constants
+    PPQ = flp.score.PPQ
+    tick_offset = PPQ // 8  # 1/16 note in ticks
+    min_duration_ticks = 1  # Ensure at least 1 tick duration
+
+    # Get user settings
+    stair_shift = form.GetInputValue(label_stair)
+    velocity_offset = form.GetInputValue(label_velocity) / 100
+    reverse_stair = form.GetInputValue(label_reverse)
+
+    # Collect all selected notes
+    notes = []
+    for n in range(flp.score.noteCount):
+        note = flp.score.getNote(n)
+        if note.selected:
+            notes.append({
+                'idx': n,
+                'start': note.time,
+                'length': note.length,
+                'end': note.time + note.length,
+                'velocity': note.velocity,
+                'pitch': note.number
+            })
+
+    if not notes:
+        print("No notes selected. Please select a rectangular chord in the Piano Roll.")
+        return
+
+    # Sort notes by pitch (ascending for positive shift, descending for negative shift)
+    notes.sort(key=lambda x: x['pitch'], reverse=reverse_stair)
+    first_note_end = notes[0]['end']  # End time of the first note
+
+    for i, note in enumerate(notes):
+        if i == 0:
+            continue
+
+        # Calculate step offset based on stair_shift and 1/64 note size
+        step_offset = abs(stair_shift) * tick_offset * i
+        new_start = notes[0]['start'] + step_offset
+
+        # Ensure the new start time doesn't exceed the first note's end
+        new_start = min(new_start, first_note_end - min_duration_ticks)
+
+        # Adjust duration to match the first note's end
+        new_length = first_note_end - new_start
+
+        # Adjust velocity
+        velocity_scale = 1 + (velocity_offset * i)
+        new_velocity = note['velocity'] * max(velocity_scale, 0.0)  # Prevent negative velocity
+        new_velocity = min(max(new_velocity, 0.0), 1.0)  # Clamp between 0.0 and 1.0
+
+        # Apply changes back to the note
+        flp.score.getNote(note['idx']).time = new_start
+        flp.score.getNote(note['idx']).length = max(new_length, min_duration_ticks)  # Ensure minimum duration
+        flp.score.getNote(note['idx']).velocity = new_velocity

@@ -37,3 +37,11 @@ C:\Program Files\Image-Line\FL Studio 2024\System\Config\Piano roll scripts\your
 ![Legato to Selected](assets/images/legato-selected-1.JPG)
 2. From piano roll "Tools", select "Legato to Selected" and connect only selected notes.
 ![Legato to Selected](assets/images/legato-selected-2.JPG)
+
+### Triangle chord 
+1. Select a rectangle chord in the piano roll (same start times).
+![Triangle chord](assets/images/triangle-1.JPG)
+2. From piano roll "Tools", select "Triangle chord" and apply the effect. Each shift increases step gap by 1/16, every additional velocity for the next step increases by 1%
+![Triangle chord](assets/images/triangle-2.JPG)
+3. Stairs can be reversed by toggling the "Reverse" checkbox.
+![Triangle chord](assets/images/triangle-3.JPG)
