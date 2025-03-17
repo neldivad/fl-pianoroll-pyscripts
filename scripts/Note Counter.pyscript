@@ -1,0 +1,20 @@
+import flpianoroll as flp
+
+def createDialog():
+    # Count the number of selected notes
+    count = 0
+    for n in range(flp.score.noteCount):
+        note = flp.score.getNote(n)
+        if note.selected:
+            count += 1
+            
+    # Create the dialog with the count message
+    title = "Selected Notes Counter"
+    description = f"Number of selected notes: {count}"
+    form = flp.ScriptDialog(title, description)
+    return form
+
+def apply(form):
+    # This function is called when the dialog is closed by the user
+    # No action is needed as we're only displaying information
+    pass

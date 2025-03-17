@@ -13,6 +13,52 @@ version: 0.1
 Strums all selected chords in the Piano Roll. Chords must be quantized or have same start times to be identified as a group.
 """
 
+#--- Helper 
+
+def remove_overlaps():
+    """
+    Resolves overlapping notes in the Piano Roll.
+    Ensures no two notes of the same pitch overlap in time.
+    """
+    note_list_by_pitch = {}
+
+    class NoteObj:
+        def __init__(self, start, end, idx):
+            self.start = start
+            self.end = end
+            self.idx = idx
+
+    # Collect notes grouped by pitch
+    for i in range(flp.score.noteCount):
+        note = flp.score.getNote(i)
+        if note.number not in note_list_by_pitch:
+            note_list_by_pitch[note.number] = []
+        note_list_by_pitch[note.number].append(NoteObj(note.time, note.time + note.length, i))
+
+    # Process overlaps for each pitch group
+    for pitch, notes in note_list_by_pitch.items():
+        # Sort notes by start time
+        notes.sort(key=lambda x: x.start)
+
+        for i in range(len(notes) - 1):
+            current = notes[i]
+            next_note = notes[i + 1]
+
+            # If current note overlaps the next note
+            if current.end > next_note.start:
+                # Adjust the end time of the current note to avoid overlap
+                current.end = next_note.start
+
+                # Update the note length in the Piano Roll
+                length = current.end - current.start
+                length = max(length, flp.score.PPQ // 48)  # Minimum duration, adjust as needed
+                flp.score.getNote(current.idx).length = length
+
+    print("Overlaps resolved successfully.")
+
+
+
+#--- Create
 
 def createDialog():
     """
@@ -70,6 +116,7 @@ def apply(form):
 
     # Process each chord
     is_downstroke = True  # Start with downstroke
+    
     for start_time, chord in sorted(chords.items()):
         # Sort chord notes based on pitch (ascending for downstroke, descending for upstroke)
         chord.sort(key=lambda x: x['pitch'], reverse=not is_downstroke)
@@ -78,15 +125,14 @@ def apply(form):
         for i, note in enumerate(chord):
             # Calculate time offset
             delay = i * time_offset_ticks
+
+            # Adjust note timing
             new_start = note['start'] + delay
-            new_length = note['end'] - new_start
-
-            # Ensure minimum duration
-            new_length = max(new_length, min_duration_ticks)
-
-            # Update note timing
             flp.score.getNote(note['idx']).time = new_start
-            flp.score.getNote(note['idx']).length = new_length
+
+             # Adjust note length and ensure minimum duration
+            new_end = new_start + note['length']
+            flp.score.getNote(note['idx']).length = max(min_duration_ticks, new_end - new_start)
 
             # Calculate velocity reduction
             if i > 0:  # First note remains unchanged
@@ -99,4 +145,5 @@ def apply(form):
         if alternate_strum:
             is_downstroke = not is_downstroke
 
-    print("Strum applied successfully.")
+    # Call Remove Overlaps after strumming
+    remove_overlaps()

@@ -1,0 +1,48 @@
+# Author: David Len (NEL-V)
+# YT: https://www.youtube.com/@justneldivad
+# version: 0.1
+
+import flpianoroll as flp
+
+dialog = """
+by NEL-V
+version: 0.2
+
+This script creates a Triangle Arp effect by adjusting the end times of all selected notes.
+The end times of all notes are set to match the end time of the last selected note, preserving their start times.
+"""
+
+def createDialog():
+    form = flp.ScriptDialog("Triangle Arp", dialog)
+    return form
+
+def apply(form):
+    """
+    Adjusts the end times of selected notes to match the end time of the last note
+    while preserving their original start times.
+    """
+    # Collect all selected notes
+    notes = []
+    for n in range(flp.score.noteCount):
+        note = flp.score.getNote(n)
+        if note.selected:
+            notes.append({
+                'idx': n,
+                'start': note.time,
+                'length': note.length,
+                'end': note.time + note.length
+            })
+
+    if not notes:
+        print("No notes selected. Please select some notes in the Piano Roll.")
+        return
+
+    # Find the end time of the last note
+    last_note_end = max(note['end'] for note in notes)
+
+    # Adjust each note's end time to match the last note's end time
+    for note in notes:
+        new_length = last_note_end - note['start']
+        flp.score.getNote(note['idx']).length = max(new_length, 1)  # Ensure at least 1 tick duration
+
+    print("Triangle Arp effect applied successfully!")
